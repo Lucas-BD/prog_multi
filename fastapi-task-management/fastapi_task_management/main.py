@@ -1,6 +1,11 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.openapi.docs import get_swagger_ui_html
-from starlette.responses import RedirectResponse
+from starlette.responses import RedirectResponse, JSONResponse
+from fastapi_task_management.config.log_config import setup_logging
+from fastapi_task_management.controller.task_controller import task_router
+
+logger = setup_logging()
+logger.info('Aplicação iniciada')
 
 app = FastAPI(
     title="Gerenciador de Tarefas",
@@ -19,17 +24,33 @@ app = FastAPI(
     },
     servers=[
         {
-            "url": "http//localhost:8000",
+            "url": "http://localhost:8000",
             "description": "Dev Server"
         }
     ]
 )
 
-@app.get('/', tags=['Redirect'], include_in_schema=False)
+app.include_router(task_router)
+
+@app.exception_handler(Exception)
+async def general_excep_handler(request, exc: Exception):
+    return JSONResponse(
+        status_code=500,
+        content={"message": "Erro inesperado"}
+    )
+
+@app.exception_handler(HTTPException)
+async def general_excep_handler(request, exc: HTTPException):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"message": exc.detail}
+    )
+
+@app.get(path= '/', tags=['Redirect'], include_in_schema=False)
 async def redirect_to_docs():
     return RedirectResponse(url="/docs")
 
-@app.get('/docs', tags=['Redirect'], include_in_schema=False)
+@app.get(path= '/docs', tags=['Redirect'], include_in_schema=False)
 async def get_openapi():
     return get_swagger_ui_html(
         openapi_url="/openapi.json",
